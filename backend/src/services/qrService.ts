@@ -28,7 +28,7 @@ export class QRService {
   static async generateTableQRString(restaurantId: string, tableNumber: string): Promise<string> {
     const sessionId = uuidv4();
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const qrUrl = `${baseUrl}/order/${restaurantId}/${tableNumber}?session=${sessionId}`;
+    const qrUrl = `${baseUrl}/welcome/${restaurantId}/${tableNumber}?session=${sessionId}`;
     
     return qrUrl;
   }

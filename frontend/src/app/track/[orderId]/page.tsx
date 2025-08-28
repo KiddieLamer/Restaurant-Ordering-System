@@ -100,10 +100,21 @@ export default function OrderTrackingPage() {
 
   useEffect(() => {
     fetchOrder();
+    
+    return () => {
+      if (socket) {
+        console.log('🔌 Cleaning up WebSocket connection');
+        socket.disconnect();
+      }
+    };
+  }, [orderId]);
+
+  useEffect(() => {
     setupWebSocket();
     
     return () => {
       if (socket) {
+        console.log('🔌 Cleaning up WebSocket connection from setupWebSocket effect');
         socket.disconnect();
       }
     };
@@ -124,33 +135,105 @@ export default function OrderTrackingPage() {
   };
 
   const setupWebSocket = () => {
-    const socketConnection = io('http://localhost:3001');
+    // Clean up existing socket first
+    if (socket) {
+      console.log('🔌 Cleaning up existing socket connection');
+      socket.disconnect();
+    }
+
+    console.log('🔌 Setting up WebSocket connection for order:', orderId);
+    
+    const socketConnection = io('http://localhost:3001', {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      forceNew: true
+    });
+    
     setSocket(socketConnection);
 
-    socketConnection.emit('join-order-tracking', orderId);
+    socketConnection.on('connect', () => {
+      console.log('🔌 WebSocket connected successfully, socket ID:', socketConnection.id);
+      console.log('🔗 Joining order tracking room for order:', orderId);
+      socketConnection.emit('join-order-tracking', orderId);
+    });
+
+    socketConnection.on('disconnect', (reason) => {
+      console.log('🔌 WebSocket disconnected, reason:', reason);
+      if (reason === 'io server disconnect') {
+        // Server initiated disconnect, reconnect manually
+        socketConnection.connect();
+      }
+    });
+
+    socketConnection.on('reconnect', (attemptNumber) => {
+      console.log('🔌 WebSocket reconnected after', attemptNumber, 'attempts');
+      console.log('🔗 Rejoining order tracking room for order:', orderId);
+      socketConnection.emit('join-order-tracking', orderId);
+    });
+
+    socketConnection.on('reconnect_attempt', (attemptNumber) => {
+      console.log('🔄 WebSocket reconnection attempt:', attemptNumber);
+    });
+
+    socketConnection.on('reconnect_error', (error) => {
+      console.error('❌ WebSocket reconnection error:', error);
+    });
+
+    socketConnection.on('connect_error', (error) => {
+      console.error('❌ WebSocket connection error:', error);
+    });
     
     socketConnection.on('order-status-updated', (data: { orderId: string; status: string }) => {
+      console.log('📨 Received order-status-updated event:', JSON.stringify(data));
+      console.log('📊 Current orderId:', orderId, 'Received orderId:', data.orderId);
+      
       if (data.orderId === orderId) {
-        setOrder(prev => prev ? { ...prev, status: data.status as any } : null);
+        console.log('✅ Order ID matches! Updating status from socket event to:', data.status);
+        
+        setOrder(prev => {
+          if (!prev) {
+            console.log('⚠️ No previous order state found');
+            return null;
+          }
+          console.log('🔄 Updating order status from', prev.status, 'to', data.status);
+          return { ...prev, status: data.status as any };
+        });
         
         // Add notification
         const statusInfo = statusConfig[data.status as keyof typeof statusConfig];
-        const notification = `🔔 ${statusInfo.title}: ${statusInfo.description}`;
-        setNotifications(prev => [notification, ...prev.slice(0, 4)]);
-        
-        // Show browser notification if permitted
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Status Pesanan Update', {
-            body: notification,
-            icon: '/icon-192x192.png'
+        if (statusInfo) {
+          const notification = `🔔 ${statusInfo.title}: ${statusInfo.description}`;
+          setNotifications(prev => {
+            const newNotifications = [notification, ...prev.slice(0, 4)];
+            console.log('🔔 Added notification:', notification);
+            console.log('📋 Updated notifications array:', newNotifications);
+            return newNotifications;
           });
+          
+          // Show browser notification if permitted
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Status Pesanan Update', {
+              body: notification,
+              icon: '/icon-192x192.png'
+            });
+            console.log('📱 Browser notification sent');
+          }
+        } else {
+          console.log('⚠️ No status info found for status:', data.status);
         }
+      } else {
+        console.log('❌ Order ID mismatch. Expected:', orderId, 'Received:', data.orderId);
       }
     });
 
     // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+      Notification.requestPermission().then((permission) => {
+        console.log('📱 Notification permission:', permission);
+      });
     }
   };
 

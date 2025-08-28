@@ -54,10 +54,12 @@ export default function KitchenDashboard() {
     newSocket.emit('join-kitchen');
 
     newSocket.on('new-order', (order: Order) => {
+      console.log('📨 Kitchen received new-order:', order.orderNumber);
       setOrders(prev => [order, ...prev]);
     });
 
     newSocket.on('order-updated', (updatedOrder: Order) => {
+      console.log('📨 Kitchen received order-updated:', updatedOrder.orderNumber, 'status:', updatedOrder.status);
       setOrders(prev => 
         prev.map(order => 
           order.id === updatedOrder.id ? updatedOrder : order
@@ -85,8 +87,10 @@ export default function KitchenDashboard() {
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     try {
+      console.log(`🔄 Updating order ${orderId} status to: ${status}`);
+      
       const response = await fetch(`http://localhost:3001/api/orders/${orderId}/status`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -95,11 +99,14 @@ export default function KitchenDashboard() {
 
       if (!response.ok) throw new Error('Failed to update order status');
       
+      console.log(`✅ Successfully updated order status to: ${status}`);
+      
       if (status === 'READY' || status === 'SERVED') {
+        console.log(`🗑️ Removing order from kitchen view (status: ${status})`);
         setOrders(prev => prev.filter(order => order.id !== orderId));
       }
     } catch (error) {
-      console.error('Error updating order status:', error);
+      console.error('❌ Error updating order status:', error);
       alert('Failed to update order status');
     }
   };
@@ -138,77 +145,140 @@ export default function KitchenDashboard() {
             <p className="text-gray-500 mt-2">New orders will appear here automatically</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {orders.map(order => (
-              <div key={order.id} className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-bold text-lg">{order.orderNumber}</h3>
-                    <p className="text-gray-600">Table {order.table.tableNumber}</p>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Clock size={16} className="mr-1" />
-                    {getOrderDuration(order.createdAt)}m ago
-                  </div>
-                </div>
-
-                <div className={`inline-block px-3 py-1 rounded-full text-sm border mb-4 ${statusColors[order.status]}`}>
-                  {order.status.replace('_', ' ')}
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  {order.orderItems.map(item => (
-                    <div key={item.id} className="flex justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {orders.map(order => {
+              const duration = getOrderDuration(order.createdAt);
+              const isUrgent = duration > 15;
+              
+              return (
+                <div 
+                  key={order.id} 
+                  className={`bg-white border-l-4 shadow-lg transform transition-all hover:scale-105 ${
+                    order.status === 'PENDING' ? 'border-yellow-400 bg-yellow-50' :
+                    order.status === 'CONFIRMED' ? 'border-blue-400 bg-blue-50' :
+                    order.status === 'PREPARING' ? 'border-orange-400 bg-orange-50' :
+                    'border-green-400 bg-green-50'
+                  } ${isUrgent ? 'ring-2 ring-red-300 animate-pulse' : ''}`}
+                  style={{
+                    fontFamily: 'monospace',
+                    backgroundImage: `repeating-linear-gradient(
+                      90deg,
+                      transparent,
+                      transparent 98%,
+                      #e5e7eb 100%
+                    )`
+                  }}
+                >
+                  {/* Ticket Header */}
+                  <div className="bg-white p-3 border-b-2 border-dashed border-gray-300">
+                    <div className="flex justify-between items-center">
                       <div>
-                        <span className="font-medium">{item.quantity}x {item.menuItem.name}</span>
-                        {item.notes && (
-                          <p className="text-sm text-gray-600 italic">Note: {item.notes}</p>
-                        )}
+                        <h3 className="font-bold text-lg text-gray-800 tracking-wider">
+                          #{order.orderNumber.split('-')[1]}
+                        </h3>
+                        <p className="text-sm text-gray-600 font-medium">
+                          🪑 TABLE {order.table.tableNumber}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-xs px-2 py-1 rounded-full font-bold ${
+                          isUrgent ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          ⏰ {duration}min
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
 
-                <div className="border-t pt-4">
-                  <div className="flex space-x-2">
-                    {order.status === 'PENDING' && (
+                  {/* Status Badge */}
+                  <div className="p-3 pb-2">
+                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold border-2 ${statusColors[order.status]}`}>
+                      {order.status === 'PENDING' && '🔔 MENUNGGU KONFIRMASI'}
+                      {order.status === 'CONFIRMED' && '✅ DIKONFIRMASI'}
+                      {order.status === 'PREPARING' && '👨‍🍳 SEDANG DIMASAK'}
+                      {order.status === 'READY' && '🍽️ SIAP DIANTAR'}
+                    </div>
+                  </div>
+
+                  {/* Order Items - Ticket Style */}
+                  <div className="px-3 pb-3">
+                    <div className="bg-white p-3 border border-dashed border-gray-300 font-mono text-sm">
+                      <div className="border-b border-dashed border-gray-400 pb-2 mb-2">
+                        <p className="font-bold text-center">📋 ORDER DETAILS</p>
+                      </div>
+                      
+                      {order.orderItems.map((item, index) => (
+                        <div key={item.id} className="mb-2 last:mb-0">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <span className="font-bold text-gray-800">
+                                {item.quantity}x {item.menuItem.name}
+                              </span>
+                              {item.notes && (
+                                <div className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded mt-1 border-l-2 border-orange-400">
+                                  📝 {item.notes}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {index < order.orderItems.length - 1 && (
+                            <div className="border-b border-dotted border-gray-300 mt-2"></div>
+                          )}
+                        </div>
+                      ))}
+                      
+                      <div className="border-t border-dashed border-gray-400 pt-2 mt-2">
+                        <div className="flex justify-between font-bold text-gray-800">
+                          <span>TOTAL:</span>
+                          <span>Rp {order.totalAmount.toLocaleString('id-ID')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="p-3 bg-gray-50 border-t border-dashed border-gray-300">
+                    <div className="space-y-2">
+                      {order.status === 'PENDING' && (
+                        <button
+                          onClick={() => updateOrderStatus(order.id, 'CONFIRMED')}
+                          className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 flex items-center justify-center font-bold text-sm transition-colors"
+                        >
+                          <CheckCircle size={16} className="mr-2" />
+                          ✅ TERIMA PESANAN
+                        </button>
+                      )}
+                      
+                      {order.status === 'CONFIRMED' && (
+                        <button
+                          onClick={() => updateOrderStatus(order.id, 'PREPARING')}
+                          className="w-full bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 flex items-center justify-center font-bold text-sm transition-colors"
+                        >
+                          👨‍🍳 MULAI MASAK
+                        </button>
+                      )}
+                      
+                      {order.status === 'PREPARING' && (
+                        <button
+                          onClick={() => updateOrderStatus(order.id, 'READY')}
+                          className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 flex items-center justify-center font-bold text-sm transition-colors"
+                        >
+                          🍽️ SIAP DIANTAR
+                        </button>
+                      )}
+                      
                       <button
-                        onClick={() => updateOrderStatus(order.id, 'CONFIRMED')}
-                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 flex items-center justify-center"
+                        onClick={() => updateOrderStatus(order.id, 'CANCELLED')}
+                        className="w-full bg-red-600 text-white py-2 px-3 rounded-lg hover:bg-red-700 flex items-center justify-center font-bold text-xs transition-colors"
                       >
-                        <CheckCircle size={16} className="mr-2" />
-                        Confirm
+                        <XCircle size={14} className="mr-1" />
+                        ❌ BATAL
                       </button>
-                    )}
-                    
-                    {order.status === 'CONFIRMED' && (
-                      <button
-                        onClick={() => updateOrderStatus(order.id, 'PREPARING')}
-                        className="flex-1 bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 flex items-center justify-center"
-                      >
-                        Start Preparing
-                      </button>
-                    )}
-                    
-                    {order.status === 'PREPARING' && (
-                      <button
-                        onClick={() => updateOrderStatus(order.id, 'READY')}
-                        className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 flex items-center justify-center"
-                      >
-                        Mark Ready
-                      </button>
-                    )}
-                    
-                    <button
-                      onClick={() => updateOrderStatus(order.id, 'CANCELLED')}
-                      className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 flex items-center justify-center"
-                    >
-                      <XCircle size={16} />
-                    </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

@@ -18,11 +18,13 @@ model Restaurant {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tables     Table[]
-  categories Category[]
-  menuItems  MenuItem[]
-  orders     Order[]
-  users      User[]
+  tables         Table[]
+  categories     Category[]
+  menuItems      MenuItem[]
+  orders         Order[]
+  users          User[]
+  cashFlows      CashFlow[]
+  stockMovements StockMovement[]
 
   @@map("restaurants")
 }
@@ -69,12 +71,16 @@ model MenuItem {
   categoryId   String
   restaurantId String
   sortOrder    Int     @default(0)
+  stockQuantity Int     @default(0)
+  minStockAlert Int     @default(5)
+  unit         String  @default("pcs")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
+  stockMovements StockMovement[]
 
   @@map("menu_items")
 }
@@ -90,8 +96,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  orders     Order[]
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders         Order[]
+  cashFlows      CashFlow[]
+  stockMovements StockMovement[]
 
   @@map("users")
 }
@@ -105,16 +113,19 @@ model Order {
   paymentMethod String?
   paymentId    String?
   notes        String?
+  customerName String?
   tableId      String
   restaurantId String
   userId       String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  table      Table       @relation(fields: [tableId], references: [id])
-  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  user       User?       @relation(fields: [userId], references: [id])
-  orderItems OrderItem[]
+  table          Table           @relation(fields: [tableId], references: [id])
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user           User?           @relation(fields: [userId], references: [id])
+  orderItems     OrderItem[]
+  cashFlows      CashFlow[]
+  stockMovements StockMovement[]
 
   @@map("orders")
 }
@@ -157,4 +168,56 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+model CashFlow {
+  id           String       @id @default(uuid())
+  type         CashFlowType
+  amount       Float
+  description  String
+  category     String?
+  orderId      String?
+  restaurantId String
+  createdBy    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  order      Order?      @relation(fields: [orderId], references: [id])
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [createdBy], references: [id])
+
+  @@map("cash_flows")
+}
+
+model StockMovement {
+  id           String           @id @default(uuid())
+  type         StockMovementType
+  quantity     Int
+  previousStock Int
+  newStock     Int
+  reason       String?
+  orderId      String?
+  menuItemId   String
+  restaurantId String
+  createdBy    String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  menuItem   MenuItem    @relation(fields: [menuItemId], references: [id])
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  order      Order?      @relation(fields: [orderId], references: [id])
+  user       User?       @relation(fields: [createdBy], references: [id])
+
+  @@map("stock_movements")
+}
+
+enum CashFlowType {
+  INCOME
+  EXPENSE
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
 }
