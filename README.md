@@ -1,7 +1,3 @@
-# Restaurant-Ordering-System
-
-
-
 # 🍽️ Restaurant Ordering System
 
 Aplikasi ini adalah sistem pemesanan restoran berbasis QR Code.  
