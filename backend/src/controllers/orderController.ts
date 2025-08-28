@@ -31,7 +31,7 @@ export class OrderController {
           });
         }
 
-        const itemTotal = menuItem.price.toNumber() * item.quantity;
+        const itemTotal = menuItem.price * item.quantity;
         totalAmount += itemTotal;
 
         orderItems.push({
@@ -67,6 +67,10 @@ export class OrderController {
 
       io.to('kitchen').emit('new-order', order);
       io.to(`table-${tableId}`).emit('order-created', order);
+      io.to(`order-${order.id}`).emit('order-status-updated', {
+        orderId: order.id,
+        status: order.status
+      });
 
       res.json(order);
     } catch (error) {
@@ -87,11 +91,16 @@ export class OrderController {
               menuItem: true
             }
           },
-          table: true,
-          restaurant: {
-            select: {
-              id: true,
-              name: true
+          table: {
+            include: {
+              restaurant: {
+                select: {
+                  id: true,
+                  name: true,
+                  description: true,
+                  logo: true
+                }
+              }
             }
           }
         }
@@ -128,6 +137,10 @@ export class OrderController {
 
       io.to('kitchen').emit('order-updated', order);
       io.to(`table-${order.tableId}`).emit('order-status-updated', {
+        orderId: order.id,
+        status: order.status
+      });
+      io.to(`order-${order.id}`).emit('order-status-updated', {
         orderId: order.id,
         status: order.status
       });

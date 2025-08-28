@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { ShoppingCart, Plus, Minus } from 'lucide-react';
 
 interface MenuItem {
@@ -40,6 +40,7 @@ interface Table {
 export default function OrderPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const restaurantId = params.restaurantId as string;
   const tableNumber = params.tableNumber as string;
   const sessionId = searchParams.get('session');
@@ -144,7 +145,12 @@ export default function OrderPage() {
       if (!response.ok) throw new Error('Failed to create order');
       
       const order = await response.json();
-      alert(`Order submitted successfully! Order number: ${order.orderNumber}`);
+      
+      // Redirect to order tracking page
+      router.push(`/track/${order.id}`);
+      
+      // Show success message briefly
+      alert(`Order submitted! Redirecting to order tracking...`);
       setCart([]);
     } catch (err) {
       alert('Failed to submit order. Please try again.');

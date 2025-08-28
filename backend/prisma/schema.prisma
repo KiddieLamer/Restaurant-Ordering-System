@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -63,7 +63,7 @@ model MenuItem {
   id           String  @id @default(uuid())
   name         String
   description  String?
-  price        Decimal @db.Decimal(10, 2)
+  price        Float
   image        String?
   isAvailable  Boolean @default(true)
   categoryId   String
@@ -100,7 +100,7 @@ model Order {
   id           String      @id @default(uuid())
   orderNumber  String      @unique
   status       OrderStatus @default(PENDING)
-  totalAmount  Decimal     @db.Decimal(10, 2)
+  totalAmount  Float
   paymentStatus PaymentStatus @default(PENDING)
   paymentMethod String?
   paymentId    String?
@@ -122,7 +122,7 @@ model Order {
 model OrderItem {
   id         String  @id @default(uuid())
   quantity   Int
-  price      Decimal @db.Decimal(10, 2)
+  price      Float
   notes      String?
   orderId    String
   menuItemId String

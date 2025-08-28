@@ -45,6 +45,11 @@ io.on('connection', (socket) => {
     socket.join('kitchen');
     console.log(`Client ${socket.id} joined kitchen`);
   });
+
+  socket.on('join-order-tracking', (orderId: string) => {
+    socket.join(`order-${orderId}`);
+    console.log(`Client ${socket.id} joined order tracking ${orderId}`);
+  });
   
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);

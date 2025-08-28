@@ -86,7 +86,7 @@ export default function KitchenDashboard() {
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     try {
       const response = await fetch(`http://localhost:3001/api/orders/${orderId}/status`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
